@@ -9,13 +9,17 @@ interface ApiResponse {
     page: number;
 }
 
-export async function fetchMovies(query: string): Promise<ApiResponse> {
+export async function fetchMovies(
+    query: string,
+    page: number,
+): Promise<ApiResponse> {
     const response = await axios.get<ApiResponse>(
         'https://api.themoviedb.org/3/search/movie',
         {
             params: {
                 query,
                 language: 'en-US',
+                page,
             },
             headers: {
                 Authorization: `Bearer ${myKey}`,

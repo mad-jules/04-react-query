@@ -1,18 +1,29 @@
-import { useEffect, useState } from 'react';
-import { fetchMovies, fetchTrendMovies } from '../../services/movieService';
+import { useState } from 'react';
+import { fetchMovies } from '../../services/movieService';
 import { SearchBar } from '../SearchBar/SearchBar';
 import type { Movie } from '../../types/movie';
 import { MovieGrid } from '../MovieGrid/MovieGrid';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import { ErrorMessage } from '../ErrorMessage/ErrorMessage';
 import { Loader } from '../Loader/Loader';
 import { MovieModal } from '../MovieModal/MovieModal';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import ReactPaginate from 'react-paginate';
+import css from './App.module.css';
 
 export default function App() {
-    const [movies, setMovies] = useState<Movie[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isError, setIsError] = useState(false);
     const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+    const [page, setPage] = useState(0);
+    const [query, setQuery] = useState('');
+
+    const { data, isError, isFetching } = useQuery({
+        queryKey: ['movies', query, page],
+        queryFn: () => {
+            return fetchMovies(query, page);
+        },
+        enabled: query !== '' && page > 0,
+        placeholderData: keepPreviousData,
+    });
 
     function onSelect(movie: Movie) {
         setSelectedMovie(movie);
@@ -23,36 +34,29 @@ export default function App() {
     }
 
     async function handleSubmit(query: string) {
-        try {
-            setIsError(false);
-            setIsLoading(true);
-            setMovies([]);
-            const response = await fetchMovies(query);
-            setMovies(response.results);
-            if (!response.results.length) {
-                toast.error('No movies found for your request.');
-            }
-        } catch (error) {
-            setIsError(true);
-            console.log(error);
-        } finally {
-            setIsLoading(false);
-        }
+        setQuery(query);
+        setPage(1);
     }
-
-    useEffect(() => {
-        async function fetchInitialMovies() {
-            const initialMovies = await fetchTrendMovies();
-            setMovies(initialMovies.results);
-        }
-        fetchInitialMovies();
-    }, []);
 
     return (
         <>
             <SearchBar onSubmit={handleSubmit} />
 
-            {isLoading && Loader()}
+            {data?.total_pages && data.total_pages > 1 ? (
+                <ReactPaginate
+                    pageRangeDisplayed={5}
+                    marginPagesDisplayed={1}
+                    onPageChange={({ selected }) => setPage(selected + 1)}
+                    forcePage={page - 1}
+                    containerClassName={css.pagination}
+                    activeClassName={css.active}
+                    nextLabel="→"
+                    previousLabel="←"
+                    pageCount={data.total_pages}
+                />
+            ) : null}
+
+            {isFetching && Loader()}
 
             {isError && ErrorMessage()}
 
@@ -60,8 +64,8 @@ export default function App() {
                 <MovieModal movie={selectedMovie} onClose={closeModal} />
             )}
 
-            {Boolean(movies.length) && (
-                <MovieGrid onSelect={onSelect} movies={movies} />
+            {Boolean(data?.results.length) && (
+                <MovieGrid onSelect={onSelect} movies={data!.results} />
             )}
 
             <Toaster />
