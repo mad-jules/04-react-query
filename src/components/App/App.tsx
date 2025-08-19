@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchMovies } from '../../services/movieService';
 import { SearchBar } from '../SearchBar/SearchBar';
 import type { Movie } from '../../types/movie';
 import { MovieGrid } from '../MovieGrid/MovieGrid';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import { ErrorMessage } from '../ErrorMessage/ErrorMessage';
 import { Loader } from '../Loader/Loader';
 import { MovieModal } from '../MovieModal/MovieModal';
@@ -13,17 +13,24 @@ import css from './App.module.css';
 
 export default function App() {
     const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-    const [page, setPage] = useState(0);
+    const [page, setPage] = useState(1);
     const [query, setQuery] = useState('');
 
-    const { data, isError, isFetching } = useQuery({
+    const { data, isError, isFetching, isSuccess } = useQuery({
         queryKey: ['movies', query, page],
         queryFn: () => {
             return fetchMovies(query, page);
         },
-        enabled: query !== '' && page > 0,
+        enabled: query !== '',
         placeholderData: keepPreviousData,
     });
+
+    useEffect(() => {
+        if (!isSuccess || data.total_results > 0) {
+            return;
+        }
+        toast.error('No movies found for your request.');
+    }, [isSuccess, data]);
 
     function onSelect(movie: Movie) {
         setSelectedMovie(movie);
@@ -56,16 +63,16 @@ export default function App() {
                 />
             ) : null}
 
-            {isFetching && Loader()}
+            {isFetching && <Loader />}
 
-            {isError && ErrorMessage()}
+            {isError && <ErrorMessage />}
 
             {selectedMovie && (
                 <MovieModal movie={selectedMovie} onClose={closeModal} />
             )}
 
-            {Boolean(data?.results.length) && (
-                <MovieGrid onSelect={onSelect} movies={data!.results} />
+            {data && data.results.length && (
+                <MovieGrid onSelect={onSelect} movies={data.results} />
             )}
 
             <Toaster />
